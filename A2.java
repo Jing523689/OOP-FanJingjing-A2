@@ -4,7 +4,7 @@
  */
 public abstract class Person {
     // 3个实例变量（姓名、年龄、联系电话）
-    private String name;
+    protected String name;  // 改为protected，便于子类访问
     private int age;
     private String phoneNumber;
 
@@ -141,14 +141,15 @@ public class Visitor extends Person {
 
     // 用于CSV文件读写的辅助方法（返回CSV格式字符串）
     public String toCsvString() {
-        return name + "," + age + "," + phoneNumber + "," + visitorId + "," + hasFastPass;
+        return getName() + "," + getAge() + "," + getPhoneNumber() + "," + visitorId + "," + hasFastPass;
     }
 
     // 从CSV字符串解析游客对象
     public static Visitor fromCsvString(String csvLine) {
         String[] parts = csvLine.split(",");
         if (parts.length != 5) {
-            return null; // 格式错误返回null
+            System.out.println("警告：CSV格式错误，跳过此行：" + csvLine);
+            return null;
         }
         try {
             String name = parts[0];
@@ -158,8 +159,23 @@ public class Visitor extends Person {
             boolean hasFastPass = Boolean.parseBoolean(parts[4]);
             return new Visitor(name, age, phone, visitorId, hasFastPass);
         } catch (Exception e) {
+            System.out.println("警告：解析CSV行失败：" + csvLine + "，错误：" + e.getMessage());
             return null;
         }
+    }
+    
+    // 重写equals方法，用于集合比较
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        Visitor visitor = (Visitor) obj;
+        return visitorId.equals(visitor.visitorId);
+    }
+    
+    @Override
+    public int hashCode() {
+        return visitorId.hashCode();
     }
 }
 
@@ -235,7 +251,7 @@ public class Ride implements RideInterface {
         this.rideName = rideName;
         this.rideType = rideType;
         this.operator = operator;
-        this.maxRider = maxRider;
+        this.maxRider = Math.max(1, maxRider); // 确保至少1人
         this.waitingQueue = new LinkedList<>();
         this.rideHistory = new LinkedList<>();
         this.numOfCycles = 0;
@@ -394,6 +410,8 @@ public class Ride implements RideInterface {
         }
 
         System.out.println("\n【" + rideName + "】开始运行第" + (numOfCycles + 1) + "个周期（最大载客量：" + maxRider + "）");
+        System.out.println("操作员：" + operator.getName() + "（" + operator.getPosition() + "）");
+        
         int ridersThisCycle = 0;
 
         // 按maxRider数量从队列转移到历史记录
@@ -426,6 +444,7 @@ public class Ride implements RideInterface {
                 writer.newLine();
             }
             System.out.println("成功导出【" + rideName + "】的历史记录到文件：" + filePath);
+            System.out.println("共导出 " + rideHistory.size() + " 条记录");
         } catch (IOException e) {
             System.out.println("错误：导出文件失败！原因：" + e.getMessage());
         }
@@ -455,14 +474,22 @@ public class Ride implements RideInterface {
                 if (visitor != null) {
                     rideHistory.add(visitor);
                     importedCount++;
-                } else {
-                    System.out.println("警告：跳过无效数据行：" + line);
                 }
             }
             System.out.println("成功从文件【" + filePath + "】导入" + importedCount + "名游客到【" + rideName + "】的历史记录");
         } catch (IOException e) {
             System.out.println("错误：导入文件失败！原因：" + e.getMessage());
         }
+    }
+    
+    // 获取等待队列大小
+    public int getQueueSize() {
+        return waitingQueue.size();
+    }
+    
+    // 获取历史记录大小
+    public int getHistorySize() {
+        return rideHistory.size();
     }
 }
 
@@ -485,8 +512,9 @@ public class AssignmentTwo {
             System.out.println("4. 演示Part5：运行设施周期");
             System.out.println("5. 演示Part6：导出历史记录到文件");
             System.out.println("6. 演示Part7：从文件导入历史记录");
+            System.out.println("7. 完整演示所有功能");
             System.out.println("0. 退出系统");
-            System.out.print("请选择功能（0-6）：");
+            System.out.print("请选择功能（0-7）：");
 
             int choice = scanner.nextInt();
             scanner.nextLine(); // 清空缓冲区
@@ -508,6 +536,9 @@ public class AssignmentTwo {
                     break;
                 case 6:
                     demo.partSeven();
+                    break;
+                case 7:
+                    demo.fullDemo();
                     break;
                 case 0:
                     System.out.println("退出系统，感谢使用！");
@@ -531,6 +562,7 @@ public class AssignmentTwo {
         Ride rollerCoaster = new Ride("云霄飞车", "刺激类", operator, 2);
 
         // 添加5名游客到队列
+        System.out.println("\n--- 添加5名游客到队列 ---");
         rollerCoaster.addVisitorToQueue(new Visitor("Jack", 25, "13900139001", "VIS001", true));
         rollerCoaster.addVisitorToQueue(new Visitor("Sharon", 22, "13900139002", "VIS002", false));
         rollerCoaster.addVisitorToQueue(new Visitor("Benny", 30, "13900139003", "VIS003", true));
@@ -538,13 +570,18 @@ public class AssignmentTwo {
         rollerCoaster.addVisitorToQueue(new Visitor("Lily", 24, "13900139005", "VIS005", true));
 
         // 打印队列
+        System.out.println("\n--- 打印当前队列 ---");
         rollerCoaster.printQueue();
 
         // 移除1名游客
+        System.out.println("\n--- 移除1名游客 ---");
         rollerCoaster.removeVisitorFromQueue();
 
         // 打印移除后的队列
+        System.out.println("\n--- 打印移除后的队列 ---");
         rollerCoaster.printQueue();
+        
+        System.out.println("Part3 演示完成！");
     }
 
     /**
@@ -552,9 +589,10 @@ public class AssignmentTwo {
      */
     public void partFourA() {
         System.out.println("\n===== 演示Part4A：历史记录管理 =====");
-        Ride thunderstorm = new Ride("雷霆风暴", "水上类", null, 4);
+        Employee operator = new Employee("王五", 28, "13800138002", "EMP003", "水上设施操作员");
+        Ride thunderstorm = new Ride("雷霆风暴", "水上类", operator, 4);
 
-        // 添加5名游客到历史记录
+        System.out.println("\n--- 添加5名游客到历史记录 ---");
         Visitor v1 = new Visitor("Tom", 27, "13700137001", "VIS006", true);
         Visitor v2 = new Visitor("Sherly", 23, "13700137002", "VIS007", false);
         Visitor v3 = new Visitor("Ben", 32, "13700137003", "VIS008", true);
@@ -567,15 +605,17 @@ public class AssignmentTwo {
         thunderstorm.addVisitorToHistory(v4);
         thunderstorm.addVisitorToHistory(v5);
 
-        // 检查游客是否在历史记录中
+        System.out.println("\n--- 检查游客是否在历史记录中 ---");
         thunderstorm.checkVisitorFromHistory(v2); // 存在
         thunderstorm.checkVisitorFromHistory(new Visitor("Mike", 20, "13700137006", "VIS011", false)); // 不存在
 
-        // 打印历史记录人数
+        System.out.println("\n--- 打印历史记录人数 ---");
         thunderstorm.numberOfVisitors();
 
-        // 打印历史记录详情（使用Iterator）
+        System.out.println("\n--- 打印历史记录详情（使用Iterator） ---");
         thunderstorm.printRideHistory();
+        
+        System.out.println("Part4A 演示完成！");
     }
 
     /**
@@ -583,25 +623,29 @@ public class AssignmentTwo {
      */
     public void partFourB() {
         System.out.println("\n===== 演示Part4B：历史记录排序 =====");
-        Ride FerrisWheel = new Ride("摩天轮", "观光类", null, 8);
+        Employee operator = new Employee("赵六", 35, "13800138003", "EMP004", "观光设施操作员");
+        Ride ferrisWheel = new Ride("摩天轮", "观光类", operator, 8);
 
-        // 添加5名游客（年龄和姓名无序）
-        FerrisWheel.addVisitorToHistory(new Visitor("Bob", 35, "13600136001", "VIS012", false));
-        FerrisWheel.addVisitorToHistory(new Visitor("Alice", 22, "13600136002", "VIS013", true));
-        FerrisWheel.addVisitorToHistory(new Visitor("Charlie", 28, "13600136003", "VIS014", false));
-        FerrisWheel.addVisitorToHistory(new Visitor("Anna", 22, "13600136004", "VIS015", true));
-        FerrisWheel.addVisitorToHistory(new Visitor("David", 30, "13600136005", "VIS016", false));
+        System.out.println("\n--- 添加5名游客（年龄和姓名无序） ---");
+        ferrisWheel.addVisitorToHistory(new Visitor("Bob", 35, "13600136001", "VIS012", false));
+        ferrisWheel.addVisitorToHistory(new Visitor("Alice", 22, "13600136002", "VIS013", true));
+        ferrisWheel.addVisitorToHistory(new Visitor("Charlie", 28, "13600136003", "VIS014", false));
+        ferrisWheel.addVisitorToHistory(new Visitor("Anna", 22, "13600136004", "VIS015", true));
+        ferrisWheel.addVisitorToHistory(new Visitor("David", 30, "13600136005", "VIS016", false));
 
         // 打印排序前的历史记录
-        System.out.println("\n排序前：");
-        FerrisWheel.printRideHistory();
+        System.out.println("\n--- 排序前的历史记录 ---");
+        ferrisWheel.printRideHistory();
 
         // 使用自定义比较器排序（年龄升序，姓名升序）
-        FerrisWheel.sortRideHistory(new VisitorComparator());
+        System.out.println("\n--- 使用Comparator进行排序（年龄升序，年龄相同按姓名升序） ---");
+        ferrisWheel.sortRideHistory(new VisitorComparator());
 
         // 打印排序后的历史记录
-        System.out.println("排序后（按年龄升序，年龄相同按姓名升序）：");
-        FerrisWheel.printRideHistory();
+        System.out.println("\n--- 排序后的历史记录 ---");
+        ferrisWheel.printRideHistory();
+        
+        System.out.println("Part4B 演示完成！");
     }
 
     /**
@@ -614,6 +658,7 @@ public class AssignmentTwo {
         // 创建游乐设施（单周期最大载客量3人）
         Ride carousel = new Ride("旋转木马", "亲子类", operator, 3);
 
+        System.out.println("\n--- 添加10名游客到队列 ---");
         // 添加10名游客到队列
         for (int i = 0; i < 10; i++) {
             carousel.addVisitorToQueue(new Visitor(
@@ -626,18 +671,21 @@ public class AssignmentTwo {
         }
 
         // 打印运行前的队列
-        System.out.println("\n运行前的等待队列：");
+        System.out.println("\n--- 运行前的等待队列 ---");
         carousel.printQueue();
 
+        System.out.println("\n--- 运行一个周期（最大载客3人） ---");
         // 运行一个周期
         carousel.runOneCycle();
 
         // 打印运行后的队列和历史记录
-        System.out.println("\n运行后的等待队列：");
+        System.out.println("\n--- 运行后的等待队列 ---");
         carousel.printQueue();
 
-        System.out.println("运行后的历史记录：");
+        System.out.println("\n--- 运行后的历史记录 ---");
         carousel.printRideHistory();
+        
+        System.out.println("Part5 演示完成！");
     }
 
     /**
@@ -645,8 +693,10 @@ public class AssignmentTwo {
      */
     public void partSix() {
         System.out.println("\n===== 演示Part6：导出历史记录到文件 =====");
-        Ride logFlume = new Ride("激流勇进", "水上类", null, 6);
+        Employee operator = new Employee("孙七", 32, "13800138004", "EMP005", "水上设施操作员");
+        Ride logFlume = new Ride("激流勇进", "水上类", operator, 6);
 
+        System.out.println("\n--- 添加5名游客到历史记录 ---");
         // 添加5名游客到历史记录
         logFlume.addVisitorToHistory(new Visitor("Emma", 24, "13300133001", "VIS027", true));
         logFlume.addVisitorToHistory(new Visitor("Olivia", 26, "13300133002", "VIS028", false));
@@ -654,9 +704,16 @@ public class AssignmentTwo {
         logFlume.addVisitorToHistory(new Visitor("Liam", 27, "13300133004", "VIS030", false));
         logFlume.addVisitorToHistory(new Visitor("Sophia", 23, "13300133005", "VIS031", true));
 
+        // 打印当前历史记录
+        System.out.println("\n--- 当前历史记录 ---");
+        logFlume.printRideHistory();
+
         // 导出到CSV文件（默认保存到项目根目录）
         String filePath = "ride_history_export.csv";
+        System.out.println("\n--- 导出历史记录到CSV文件 ---");
         logFlume.exportRideHistory(filePath);
+        
+        System.out.println("Part6 演示完成！文件已保存到：" + filePath);
     }
 
     /**
@@ -664,15 +721,48 @@ public class AssignmentTwo {
      */
     public void partSeven() {
         System.out.println("\n===== 演示Part7：从文件导入历史记录 =====");
-        Ride importRide = new Ride("导入测试设施", "测试类", null, 5);
+        Employee operator = new Employee("周八", 29, "13800138005", "EMP006", "测试设施操作员");
+        Ride importRide = new Ride("导入测试设施", "测试类", operator, 5);
+
+        System.out.println("\n--- 导入前历史记录 ---");
+        importRide.printRideHistory();
 
         // 导入Part6生成的CSV文件
         String filePath = "ride_history_export.csv";
+        System.out.println("\n--- 从CSV文件导入历史记录 ---");
         importRide.importRideHistory(filePath);
 
         // 验证导入结果
+        System.out.println("\n--- 导入后历史记录 ---");
         importRide.numberOfVisitors();
         importRide.printRideHistory();
+        
+        System.out.println("Part7 演示完成！");
+    }
+    
+    /**
+     * 完整演示所有功能
+     */
+    public void fullDemo() {
+        System.out.println("\n===== 完整演示所有功能 =====");
+        System.out.println("=== 演示Part3：等待队列管理 ===");
+        partThree();
+        
+        System.out.println("\n=== 演示Part4A：历史记录管理 ===");
+        partFourA();
+        
+        System.out.println("\n=== 演示Part4B：历史记录排序 ===");
+        partFourB();
+        
+        System.out.println("\n=== 演示Part5：运行设施周期 ===");
+        partFive();
+        
+        System.out.println("\n=== 演示Part6：导出历史记录到文件 ===");
+        partSix();
+        
+        System.out.println("\n=== 演示Part7：从文件导入历史记录 ===");
+        partSeven();
+        
+        System.out.println("\n===== 所有功能演示完成 =====");
     }
 }
-
